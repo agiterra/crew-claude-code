@@ -16,6 +16,15 @@ import { Orchestrator } from "@agiterra/pane-tools";
 
 const orchestrator = new Orchestrator();
 
+// The iTerm2 session ID of the calling agent (set by iTerm2 in every session).
+// Used to split panes relative to the caller, not whatever tab is focused.
+function callerSession(): string | undefined {
+  const raw = process.env.ITERM_SESSION_ID; // format: w0t0p1:UUID
+  if (!raw) return undefined;
+  const uuid = raw.split(":")[1];
+  return uuid;
+}
+
 // --- MCP server ---
 
 const mcp = new Server(
@@ -163,13 +172,13 @@ const TOOLS = [
   },
   {
     name: "slot_create",
-    description: "Create a named slot (pane viewport) in a tab",
+    description: "Create a named slot by splitting the current iTerm2 pane",
     inputSchema: {
       type: "object" as const,
       properties: {
         tab: { type: "string", description: "Tab name" },
         name: { type: "string", description: "Slot name" },
-        position: { type: "string", description: "Position hint (nw, ne, sw, se, etc.)" },
+        position: { type: "string", description: "Split direction: below (default), right, left, above" },
       },
       required: ["tab", "name"],
     },
@@ -186,13 +195,27 @@ const TOOLS = [
   },
   {
     name: "slot_destroy",
-    description: "Destroy a slot (detaches any agent first)",
+    description: "Destroy a slot (closes iTerm2 pane, detaches any agent first)",
     inputSchema: {
       type: "object" as const,
       properties: {
         name: { type: "string", description: "Slot name" },
       },
       required: ["name"],
+    },
+  },
+  {
+    name: "url_open",
+    description: "Open a URL in a new pane (splits current pane, opens URL in browser)",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        tab: { type: "string", description: "Tab name (must exist)" },
+        slot: { type: "string", description: "Slot name (auto-generated if omitted)" },
+        url: { type: "string", description: "URL to open" },
+        position: { type: "string", description: "Split direction: below (default), right" },
+      },
+      required: ["tab", "url"],
     },
   },
   {
@@ -229,19 +252,19 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         result = orchestrator.listAgents();
         break;
       case "agent_attach":
-        orchestrator.attachAgent(a.id as string, a.slot as string);
+        await orchestrator.attachAgent(a.id as string, a.slot as string);
         result = { attached: a.id, slot: a.slot };
         break;
       case "agent_detach":
-        orchestrator.detachAgent(a.id as string);
+        await orchestrator.detachAgent(a.id as string);
         result = { detached: a.id };
         break;
       case "agent_move":
-        orchestrator.moveAgent(a.id as string, a.slot as string);
+        await orchestrator.moveAgent(a.id as string, a.slot as string);
         result = { moved: a.id, slot: a.slot };
         break;
       case "agent_swap":
-        orchestrator.swapAgents(a.id_a as string, a.id_b as string);
+        await orchestrator.swapAgents(a.id_a as string, a.id_b as string);
         result = { swapped: [a.id_a, a.id_b] };
         break;
       case "agent_send":
@@ -262,14 +285,23 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         result = { destroyed: a.name };
         break;
       case "slot_create":
-        result = orchestrator.createSlot(a.tab as string, a.name as string, a.position as string | undefined);
+        result = await orchestrator.createSlot(a.tab as string, a.name as string, a.position as string | undefined, callerSession());
         break;
       case "slot_list":
         result = orchestrator.listSlots(a.tab as string | undefined);
         break;
       case "slot_destroy":
-        orchestrator.deleteSlot(a.name as string);
+        await orchestrator.deleteSlot(a.name as string);
         result = { destroyed: a.name };
+        break;
+      case "url_open":
+        result = await orchestrator.openUrl({
+          tab: a.tab as string,
+          slot: a.slot as string | undefined,
+          url: a.url as string,
+          position: a.position as string | undefined,
+          relativeTo: callerSession(),
+        });
         break;
       case "reconcile":
         result = { report: await orchestrator.reconcile() };
