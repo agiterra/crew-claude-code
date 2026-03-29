@@ -171,14 +171,27 @@ const TOOLS = [
     },
   },
   {
+    name: "slot_register",
+    description: "Register your own iTerm2 pane as a named slot (uses your ITERM_SESSION_ID)",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        tab: { type: "string", description: "Tab name (created if missing)" },
+        name: { type: "string", description: "Slot name for your pane" },
+      },
+      required: ["tab", "name"],
+    },
+  },
+  {
     name: "slot_create",
-    description: "Create a named slot by splitting the current iTerm2 pane",
+    description: "Create a named slot by splitting an iTerm2 pane",
     inputSchema: {
       type: "object" as const,
       properties: {
         tab: { type: "string", description: "Tab name" },
         name: { type: "string", description: "Slot name" },
         position: { type: "string", description: "Split direction: below (default), right, left, above" },
+        relative_to: { type: "string", description: "Slot name or session UUID to split from (default: caller's pane)" },
       },
       required: ["tab", "name"],
     },
@@ -284,8 +297,23 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         orchestrator.deleteTab(a.name as string);
         result = { destroyed: a.name };
         break;
+      case "slot_register": {
+        const itermId = callerSession();
+        if (!itermId) throw new Error("ITERM_SESSION_ID not set — cannot register pane");
+        // Auto-create tab if needed
+        if (!orchestrator.store.getTab(a.tab as string)) {
+          orchestrator.createTab(a.tab as string);
+        }
+        result = orchestrator.registerSlot(a.tab as string, a.name as string, itermId);
+        break;
+      }
       case "slot_create":
-        result = await orchestrator.createSlot(a.tab as string, a.name as string, a.position as string | undefined, callerSession());
+        result = await orchestrator.createSlot(
+          a.tab as string,
+          a.name as string,
+          a.position as string | undefined,
+          (a.relative_to as string) ?? callerSession(),
+        );
         break;
       case "slot_list":
         result = orchestrator.listSlots(a.tab as string | undefined);
