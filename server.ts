@@ -218,6 +218,18 @@ const TOOLS = [
     },
   },
   {
+    name: "slot_badge",
+    description: "Set the iTerm2 badge on a slot's pane (overlay text in corner)",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        slot: { type: "string", description: "Slot name" },
+        text: { type: "string", description: "Badge text (e.g. 'ENG-1234\\nsoil-app PR #42')" },
+      },
+      required: ["slot", "text"],
+    },
+  },
+  {
     name: "slot_list",
     description: "List all slots, optionally filtered by tab",
     inputSchema: {
@@ -248,6 +260,7 @@ const TOOLS = [
         slot: { type: "string", description: "Slot name (auto-generated if omitted)" },
         url: { type: "string", description: "URL to open" },
         position: { type: "string", description: "Split direction: below (default), right" },
+        relative_to: { type: "string", description: "Slot name to split from (default: caller's pane)" },
       },
       required: ["tab", "url"],
     },
@@ -349,7 +362,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
           slot: a.slot as string | undefined,
           url: a.url as string,
           position: a.position as string | undefined,
-          relativeTo: await callerSession(),
+          relativeTo: (a.relative_to as string) ?? await callerSession(),
         });
         break;
       case "reconcile":
@@ -363,8 +376,11 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
       content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
     };
   } catch (e: any) {
+    const detail = e.stderr
+      ? `${e.message}\nstderr: ${e.stderr}\nexit: ${e.exitCode}`
+      : e.stack ?? e.message;
     return {
-      content: [{ type: "text" as const, text: `error: ${e.message}` }],
+      content: [{ type: "text" as const, text: `error: ${detail}` }],
       isError: true,
     };
   }
