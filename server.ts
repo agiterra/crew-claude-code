@@ -13,7 +13,7 @@ import {
   CallToolRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { Orchestrator, iterm } from "@agiterra/pane-tools";
-import { loadOrCreateKey, register } from "@agiterra/wire-tools";
+import { loadOrCreateKey, register, setPlan } from "@agiterra/wire-tools";
 import { execSync } from "child_process";
 
 const orchestrator = new Orchestrator();
@@ -75,6 +75,7 @@ const TOOLS = [
       properties: {
         id: { type: "string", description: "Agent ID (Wire agent name)" },
         name: { type: "string", description: "Display name" },
+        plan: { type: "string", description: "Initial plan (shown on Wire dashboard)" },
         runtime: { type: "string", description: "Runtime: claude-code, codex, etc. Default: claude-code" },
         project_dir: { type: "string", description: "Working directory for the agent" },
         extra_flags: { type: "string", description: "Additional CLI flags" },
@@ -296,6 +297,10 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
           try {
             const newKp = await loadOrCreateKey(agentId);
             await register(wireUrl, agentId, displayName, newKp.publicKey, keyPair.privateKey);
+            // Set initial plan if provided
+            if (a.plan) {
+              await setPlan(wireUrl, agentId, a.plan as string, newKp.privateKey);
+            }
           } catch (e: any) {
             // Non-fatal — agent may already be registered
             console.error(`[pane] pre-register ${agentId}: ${e.message}`);
