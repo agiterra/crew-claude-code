@@ -328,8 +328,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         break;
       }
       case "agent_interrupt":
-        await orchestrator.interruptAgent(a.id as string);
-        result = { interrupted: a.id };
+        result = await orchestrator.interruptAgent(a.id as string);
         break;
       case "agent_stop":
         await orchestrator.stopAgent(a.id as string);
