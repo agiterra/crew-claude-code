@@ -308,20 +308,8 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         // Pre-register ephemeral agent on Wire using the spawning agent's key
         if (!keyPair) throw new Error("no signing key — cannot pre-register agent");
 
-        // Create keypair in the agent's project directory (not ~/.wire/)
-        const agentProjectDir = (a.project_dir as string) ?? process.cwd();
-        const keyDir = join(agentProjectDir, ".wire", "keys");
-        const newKp = await loadOrCreateKey(agentId, keyDir);
-
-        // Ensure .wire/ is gitignored to prevent accidental key commits
-        const { existsSync, appendFileSync, readFileSync } = await import("fs");
-        const gitignorePath = join(agentProjectDir, ".gitignore");
-        if (existsSync(gitignorePath)) {
-          const content = readFileSync(gitignorePath, "utf-8");
-          if (!content.includes(".wire/")) {
-            appendFileSync(gitignorePath, "\n.wire/\n");
-          }
-        }
+        // Create keypair and register on Wire
+        const newKp = await loadOrCreateKey(agentId);
         await register(wireUrl, agentId, displayName, newKp.publicKey, keyPair.privateKey);
 
         // Set initial plan if provided
@@ -329,12 +317,17 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
           await setPlan(wireUrl, agentId, a.plan as string, newKp.privateKey);
         }
 
+        // Export private key as base64 so agent plugins can load from WIRE_PRIVATE_KEY env
+        const pkcs8 = await crypto.subtle.exportKey("pkcs8", newKp.privateKey);
+        const privateKeyB64 = Buffer.from(pkcs8).toString("base64");
+
         result = await orchestrator.launchAgent({
           id: agentId,
           displayName,
           runtime: a.runtime as string | undefined,
-          projectDir: agentProjectDir,
+          projectDir: a.project_dir as string | undefined,
           extraFlags: a.extra_flags as string | undefined,
+          privateKeyB64,
         });
         break;
       }
