@@ -13,7 +13,7 @@ import {
   CallToolRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { Orchestrator, iterm } from "@agiterra/pane-tools";
-import { loadOrCreateKey, generateKeyPair, exportPrivateKey, register, setPlan } from "@agiterra/wire-tools";
+import { generateKeyPair, exportPrivateKey, register, setPlan } from "@agiterra/wire-tools";
 import { execSync } from "child_process";
 import { join } from "path";
 
@@ -435,11 +435,22 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
 // --- Main ---
 
 async function main(): Promise<void> {
-  // Load spawning agent's key for pre-registering ephemeral agents
-  try {
-    keyPair = await loadOrCreateKey(CALLER_AGENT_ID);
-  } catch (e) {
-    console.error(`[pane] key load failed for ${CALLER_AGENT_ID}:`, e);
+  // Load spawning agent's key from WIRE_PRIVATE_KEY env (same as all agents)
+  const rawKey = process.env.WIRE_PRIVATE_KEY;
+  if (rawKey) {
+    try {
+      const pkcs8 = Uint8Array.from(atob(rawKey), (c) => c.charCodeAt(0));
+      const privateKey = await crypto.subtle.importKey("pkcs8", pkcs8, "Ed25519", true, ["sign"]);
+      const jwk = await crypto.subtle.exportKey("jwk", privateKey);
+      const pubB64Url = jwk.x!;
+      const pubB64 = pubB64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const publicKey = pubB64 + "=".repeat((4 - (pubB64.length % 4)) % 4);
+      keyPair = { publicKey, privateKey };
+    } catch (e) {
+      console.error(`[pane] failed to load WIRE_PRIVATE_KEY:`, e);
+    }
+  } else {
+    console.error("[pane] WIRE_PRIVATE_KEY not set — pre-registration disabled");
   }
 
   const transport = new StdioServerTransport();
