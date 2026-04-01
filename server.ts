@@ -15,6 +15,7 @@ import {
 import { Orchestrator, iterm } from "@agiterra/pane-tools";
 import { loadOrCreateKey, register, setPlan } from "@agiterra/wire-tools";
 import { execSync } from "child_process";
+import { join } from "path";
 
 const orchestrator = new Orchestrator();
 const CALLER_AGENT_ID =
@@ -305,25 +306,34 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         const wireUrl = process.env.WIRE_URL ?? "http://localhost:9800";
 
         // Pre-register ephemeral agent on Wire using the spawning agent's key
-        if (keyPair) {
-          try {
-            const newKp = await loadOrCreateKey(agentId);
-            await register(wireUrl, agentId, displayName, newKp.publicKey, keyPair.privateKey);
-            // Set initial plan if provided
-            if (a.plan) {
-              await setPlan(wireUrl, agentId, a.plan as string, newKp.privateKey);
-            }
-          } catch (e: any) {
-            // Non-fatal — agent may already be registered
-            console.error(`[pane] pre-register ${agentId}: ${e.message}`);
+        if (!keyPair) throw new Error("no signing key — cannot pre-register agent");
+
+        // Create keypair in the agent's project directory (not ~/.wire/)
+        const agentProjectDir = (a.project_dir as string) ?? process.cwd();
+        const keyDir = join(agentProjectDir, ".wire", "keys");
+        const newKp = await loadOrCreateKey(agentId, keyDir);
+
+        // Ensure .wire/ is gitignored to prevent accidental key commits
+        const { existsSync, appendFileSync, readFileSync } = await import("fs");
+        const gitignorePath = join(agentProjectDir, ".gitignore");
+        if (existsSync(gitignorePath)) {
+          const content = readFileSync(gitignorePath, "utf-8");
+          if (!content.includes(".wire/")) {
+            appendFileSync(gitignorePath, "\n.wire/\n");
           }
+        }
+        await register(wireUrl, agentId, displayName, newKp.publicKey, keyPair.privateKey);
+
+        // Set initial plan if provided
+        if (a.plan) {
+          await setPlan(wireUrl, agentId, a.plan as string, newKp.privateKey);
         }
 
         result = await orchestrator.launchAgent({
           id: agentId,
           displayName,
           runtime: a.runtime as string | undefined,
-          projectDir: a.project_dir as string | undefined,
+          projectDir: agentProjectDir,
           extraFlags: a.extra_flags as string | undefined,
         });
         break;
