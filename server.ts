@@ -20,7 +20,7 @@ import { join } from "path";
 const orchestrator = new Orchestrator();
 const CALLER_AGENT_ID =
   process.env.PANE_AGENT_ID ?? process.env.WIRE_AGENT_ID ?? "unknown";
-let keyPair: Awaited<ReturnType<typeof loadOrCreateKey>> | null = null;
+let keyPair: { publicKey: string; privateKey: CryptoKey } | null = null;
 
 // Resolve the caller's iTerm2 session by finding the TTY of the parent process.
 // More reliable than ITERM_SESSION_ID env var which goes stale on restart.
