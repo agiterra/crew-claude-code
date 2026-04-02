@@ -77,6 +77,7 @@ const TOOLS = [
         id: { type: "string", description: "Agent ID (Wire agent name)" },
         name: { type: "string", description: "Display name" },
         plan: { type: "string", description: "Initial plan (shown on Wire dashboard)" },
+        prompt: { type: "string", description: "Initial prompt — the agent's task. Passed as positional arg to claude." },
         runtime: { type: "string", description: "Runtime: claude-code, codex, etc. Default: claude-code" },
         project_dir: { type: "string", description: "Working directory for the agent" },
         extra_flags: { type: "string", description: "Additional CLI flags" },
@@ -310,7 +311,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
 
         // Generate keypair (no filesystem) and register on Wire
         const newKp = await generateKeyPair();
-        await register(wireUrl, agentId, displayName, newKp.publicKey, keyPair.privateKey);
+        await register(wireUrl, CALLER_AGENT_ID, agentId, displayName, newKp.publicKey, keyPair.privateKey);
 
         // Set initial plan if provided
         if (a.plan) {
@@ -327,6 +328,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
           projectDir: a.project_dir as string | undefined,
           extraFlags: a.extra_flags as string | undefined,
           privateKeyB64,
+          prompt: a.prompt as string | undefined,
         });
         break;
       }
