@@ -101,6 +101,7 @@ const TOOLS = [
         id: { type: "string", description: "Agent ID (your Wire agent name)" },
         name: { type: "string", description: "Display name" },
         runtime: { type: "string", description: "Runtime: claude-code, codex, etc. Default: claude-code" },
+        cc_session_id: { type: "string", description: "Claude Code session ID. Auto-detected from CLAUDE_CODE_SESSION_ID if omitted." },
       },
       required: ["id", "name"],
     },
@@ -112,6 +113,7 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         id: { type: "string", description: "Agent ID" },
+        cc_session_id: { type: "string", description: "Claude Code session ID — disambiguates when multiple instances share an agent ID (e.g. during handoff)" },
       },
       required: ["id"],
     },
@@ -176,6 +178,7 @@ const TOOLS = [
       properties: {
         id: { type: "string", description: "Agent ID" },
         text: { type: "string", description: "Text to send (use \\r for enter in screen sessions)" },
+        session: { type: "string", description: "Screen session name — disambiguates when multiple sessions share an agent ID" },
       },
       required: ["id", "text"],
     },
@@ -187,6 +190,7 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         id: { type: "string", description: "Agent ID" },
+        cc_session_id: { type: "string", description: "Claude Code session ID — disambiguates during handoff" },
         background: { type: "boolean", description: "If true, Ctrl-B Ctrl-B (background task). Default: Escape (cancel)." },
       },
       required: ["id"],
@@ -199,6 +203,7 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         id: { type: "string", description: "Agent ID" },
+        cc_session_id: { type: "string", description: "Claude Code session ID — disambiguates when multiple instances share an agent ID (e.g. during handoff)" },
       },
       required: ["id"],
     },
@@ -382,14 +387,15 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
           displayName: a.name as string,
           runtime: a.runtime as string | undefined,
           callerItermId: await callerSession(),
+          ccSessionId: a.cc_session_id as string | undefined,
         });
         break;
       case "agent_interrupt":
-        result = await orchestrator.interruptAgent(a.id as string, !!a.background);
+        result = await orchestrator.interruptAgent(a.id as string, !!a.background, a.cc_session_id as string | undefined);
         break;
       case "agent_stop":
-        await orchestrator.stopAgent(a.id as string);
-        result = { stopped: a.id };
+        await orchestrator.stopAgent(a.id as string, a.cc_session_id as string | undefined);
+        result = { stopped: a.id, cc_session_id: a.cc_session_id };
         break;
       case "agent_list":
         result = orchestrator.listAgents();
@@ -411,11 +417,11 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         result = { swapped: [a.id_a, a.id_b] };
         break;
       case "agent_send":
-        await orchestrator.sendToAgent(a.id as string, a.text as string);
+        await orchestrator.sendToAgent(a.id as string, a.text as string, a.cc_session_id as string | undefined);
         result = { sent: true };
         break;
       case "agent_read":
-        result = { output: await orchestrator.readAgent(a.id as string) };
+        result = { output: await orchestrator.readAgent(a.id as string, a.cc_session_id as string | undefined) };
         break;
       case "tab_create":
         result = orchestrator.createTab(a.name as string, a.theme as string | undefined);
