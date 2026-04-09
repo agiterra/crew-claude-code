@@ -56,6 +56,30 @@ https://images.pexels.com/photos/{PHOTO_ID}/pexels-photo-{PHOTO_ID}.jpeg?auto=co
 To find photo IDs, search Pexels and extract IDs from the page. The WebFetch
 tool can parse Pexels search result pages to find photo IDs.
 
+## Post-download: Resize
+
+After downloading all images, resize any that are over 500KB to 1920x1080
+using macOS `sips` (no ImageMagick needed):
+
+```bash
+for f in <theme-dir>/*.jpg; do
+  size=$(stat -f%z "$f")
+  if [ "$size" -gt 524288 ]; then
+    sips -z 1080 1920 "$f" --out "$f" 2>/dev/null
+  fi
+done
+```
+
+This keeps the theme directory under a few MB total. Wikimedia/Pexels source
+images can be 10-30MB — always resize.
+
+## Image Sources
+
+Prefer these free sources (in order):
+1. **Pexels** — direct curl downloads, no auth needed
+2. **Wikimedia Commons** — public domain, species-accurate for natural themes
+3. **Unsplash** — great quality but curl downloads often blocked (use browser)
+
 ## Important
 
 - Always verify downloaded files are valid JPEGs (`file <path>` should say "JPEG image data")
