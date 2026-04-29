@@ -107,6 +107,45 @@ agent_launch({
 
 **Do not** ask crew to generate keys, store keys, or know about Wire. Crew accepts an arbitrary `env` map and forwards it. The specific var names and their semantics are the orchestrator's responsibility.
 
+### Spawning a Codex CLI agent
+
+Codex CLI agents follow the same env-map pattern, but the runtime needs additional plumbing because Codex's MCP integration differs from CC's. Set `runtime: "codex"` and the rest is handled by `~/.wire/codex-launch.sh` (auto-loaded via `~/.wire/runtimes.json` runtime override):
+
+```
+agent_launch({
+  runtime: "codex",
+  env: {
+    AGENT_ID: "biscuit",
+    AGENT_NAME: "Biscuit",
+    AGENT_PRIVATE_KEY: "<base64 PKCS8>",
+    GITHUB_TOKEN: "<for GitHub-over-Wire>",  // optional
+    // WIRE_URL defaults to https://the-wire.ngrok.io
+  },
+  project_dir: "/path/to/worktree",
+  prompt: "Your engineer prompt — see polling guidance below.",
+})
+```
+
+**What the codex agent gets**:
+- `wire` MCP — `get_pending_messages`, `set_plan`, `heartbeat_*` tools
+- `wire-ipc` MCP — `send_message` for outbound IPC
+- `operator-relay` MCP — operator-prompt forwarding
+- `agiterra-github` MCP — GitHub-over-Wire (webhook registration)
+
+**Polling cadence — must be in the spawn prompt.** Codex doesn't support push notifications the way CC does (`notifications/claude/channel` is Claude-specific). Inbound IPC is delivered via a polling tool. Tell the agent to call `mcp__wire__get_pending_messages` at the start of each turn AND every ~10–30s during long work. Without this, IPC arrives but the agent never sees it. Sample prompt fragment:
+
+> Every turn, call `mcp__wire__get_pending_messages` first. If it returns any messages, treat them as inbound IPC from Brioche or other agents and respond to each before continuing your task.
+
+**Outbound IPC**: `mcp__wire-ipc__send_message({topic, dest, payload})` — same shape as the CC adapter.
+
+**Isolation**: each spawn gets a per-agent `CODEX_HOME` under `~/.wire/codex-spawn/<agent_id>/`. Tim's personal `~/.codex/config.toml` is untouched.
+
+**Sandbox**: spawned codex runs with `--sandbox danger-full-access` because Wire SSE + signed-IPC HTTP need network and engineers need shell write. If you need stricter sandboxing for a specific spawn, edit the launcher.
+
+**Known limitations**:
+- `knowledge-codex` and `crew-codex` aren't wired (knowledge-codex has no MCP server entry point; crew-codex transitively depends on the bun runtime). Spawned codex engineers can't run vault searches via MCP, and can't spawn sub-agents. Both are deliberate scope cuts; revisit when needed.
+- The launcher uses `tsx` rather than `bun` because codex's MCP client (rmcp) hangs when handshaking with bun-spawned stdio children. Same scripts work fine via direct `bun run` invocation; the incompatibility is at the codex spawn layer.
+
 ## Terminal Backend
 
 Crew auto-detects which terminal you're running in:
