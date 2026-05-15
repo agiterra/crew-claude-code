@@ -1,20 +1,33 @@
-# Crew
+# crew
 
-Multi-agent orchestration for Claude Code. Launch agents in persistent screen sessions, arrange them in terminal panes with themed backgrounds, and communicate between them.
+> Multi-agent orchestration. Launch AI engineers in persistent screen sessions, arrange them in themed terminal panes, and supervise them like a team.
 
-Supports both **[cmux](https://cmux.com)** and **iTerm2** as terminal backends, with auto-detection.
+Part of the [Agiterra Multi-Agent Toolkit](https://github.com/agiterra/handbook). Supports **[cmux](https://cmux.com)** and **iTerm2** with auto-detection.
 
-## Prerequisites
+## What this gets you
 
+- **Spawn agents that survive lid-closes.** Each agent runs in a `screen` session — close your terminal, kill iTerm, reboot your laptop; the agent's still there waiting.
+- **Multiple agents in one window.** Arrange them in panes, each with a themed background so you can tell them apart at a glance.
+- **Talk to them individually.** `agent_send` types a prompt into a specific agent's screen.
+- **A coordinator pattern that just works.** Your personai dispatches engineers per ticket; you supervise the personai; everyone stays in their lane.
+
+## Quick setup
+
+If you have a Claude Code agent open, say:
+
+> "Install the Agiterra crew plugin and show me how to spawn my first ephemeral engineer."
+
+Or manually:
+
+```
+/plugin marketplace add agiterra/claude-marketplace   # one-time
+/plugin install crew@agiterra
+```
+
+### Prerequisites
 - macOS with [cmux](https://cmux.com) (recommended) or [iTerm2](https://iterm2.com/)
 - `screen` (`brew install screen` if missing)
 - [Bun](https://bun.sh) (auto-installed on first plugin install if missing)
-
-## Install
-
-```
-/plugin install agiterra/crew
-```
 
 ## What It Does
 
