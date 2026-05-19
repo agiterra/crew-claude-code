@@ -97,7 +97,7 @@ Crew is a pure env-forwarder. It has no domain knowledge of Wire, signing keys, 
 
 1. **Generate an Ed25519 keypair in memory.** Never persist to disk; never rely on the spawned agent auto-creating keys. Filesystem key management was intentionally removed from shared `-tools` packages — that concern belongs to the orchestrator, not to shared libraries or to the spawned agent.
 
-2. **Pre-register the public key on Wire** using the sponsoring-agent register flow: sign the register request with your own JWT, name the new agent, and include its public key. Wire trusts your sponsorship.
+2. **Pre-register the new agent on Wire** by calling `mcp__plugin_wire_wire__register_agent({ id })` (from the `wire` plugin). In `fresh` mode this mints the keypair for you and returns `private_key_b64` — pass that to step 3 below. The request is signed under YOUR orchestrator AGENT_ID; Wire trusts you to vouch. If you're managing keys client-side, use the `byo` mode (supply `pubkey` yourself).
 
 3. **Pass everything via `env`.** Identity (`AGENT_ID`, `AGENT_NAME`), the signing key (`AGENT_PRIVATE_KEY`), and any other config the spawned agent needs all flow through the `env` map. Crew exports them verbatim into the spawned process's environment. Crew has no separate `id` or `name` parameter — those names are env conventions interpreted by Wire-using agents, not API surface that crew defines.
 
